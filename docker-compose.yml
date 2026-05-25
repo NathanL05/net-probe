@@ -6,6 +6,8 @@ services:
     volumes:
       - "./nginx/nginx.conf:/etc/nginx/nginx.conf"
       - "./nginx/certs/:/etc/nginx/certs"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana

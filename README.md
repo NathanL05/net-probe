@@ -1,6 +1,6 @@
 # NetProbe
 
-A networking and DNS deep-dive project. Nginx sits in front of PulseStack as a TLS-terminating reverse proxy, load-balancing across two exporters. A diagnostic shell script (`netprobe.sh`) checks DNS resolution, port connectivity, TLS cert expiry, HTTP timing, and listening ports in one pass.
+A hands-on networking project. Nginx proxies traffic to PulseStack over HTTPS, and a diagnostic script (`netprobe.sh`) checks that DNS, ports, TLS, and HTTP are all healthy in one run.
 
 ---
 
@@ -85,9 +85,11 @@ echo "127.0.0.1 pulsestack.local" | sudo tee -a /etc/hosts
 Verify it resolves:
 
 ```bash
-dig pulsestack.local
-# Should return 127.0.0.1
+dscacheutil -q host -a name pulsestack.local
+# Should return ip_address: 127.0.0.1
 ```
+
+> **Note:** Use `dscacheutil` instead of `dig` to verify `/etc/hosts` entries on macOS. `dig` queries DNS servers directly and will not see hosts-file entries.
 
 ### Step 3 — Generate a local TLS certificate
 
@@ -203,7 +205,7 @@ The script runs five checks and prints colour-coded results:
 
 | Check | What it does |
 |---|---|
-| DNS Resolution | Resolves a list of domains via `dig`, flags failures |
+| DNS Resolution | Resolves domains via `dscacheutil` (respects `/etc/hosts`) with `dig` as fallback |
 | Port Connectivity | Tests host:port pairs with `nc -z` |
 | TLS Cert Expiry | Reads `notAfter` from each HTTPS endpoint via `openssl` |
 | HTTP Timing | Reports `time_total` for each URL via `curl -w` |
@@ -241,7 +243,10 @@ make proxy-down
 
 **Nginx container exits immediately**
 - Run `docker compose logs nginx` to see the error
-- Common cause: `nginx/certs/` is empty or the filenames don't match `nginx.conf`
+- Common causes:
+  - `nginx/certs/` is empty or the filenames don't match `nginx.conf`
+  - `nginx.conf` is missing the required `events {}` block or the `http {}` wrapper — all `upstream` and `server` blocks must be nested inside `http {}`
+  - `host.docker.internal` not resolving inside the container — ensure `extra_hosts: host.docker.internal:host-gateway` is set in `docker-compose.yml`
 
 **`/metrics` returns a 502**
 - PulseStack is not running on port 8000 — start it first (`python main.py` in the PulseStack directory)

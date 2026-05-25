@@ -2,6 +2,7 @@
 
 domains=("google.com" "github.com" "pulsestack.local")
 pairs=("google.com:443" "github.com:443" "localhost:8000")
+tls_pairs=("google.com:443" "github.com:443" "pulsestack.local:443")
 urls=("https://google.com" "https://github.com")
 
 GREEN='\033[0;32m'
@@ -11,7 +12,8 @@ NC='\033[0m'
 echo "=== DNS Resolution ==="
 
 for domain in "${domains[@]}"; do
-    result=$(dig +short $domain | head -1)
+    result=$(dscacheutil -q host -a name "$domain" 2>/dev/null | awk '/ip_address/{print $2; exit}')
+    [ -z "$result" ] && result=$(dig +short "$domain" | head -1)
 
     if [ -z "$result" ]; then
         result="${RED}FAILED${NC}"
@@ -35,8 +37,8 @@ done
 
 echo "=== TLS Cert Expiry ==="
 
-for pair in "${pairs[@]}"; do
-    not_after=$(openssl s_client -connect $pair </dev/null 2>/dev/null | openssl x509 -noout -dates | grep notAfter)
+for pair in "${tls_pairs[@]}"; do
+    not_after=$(openssl s_client -connect "$pair" </dev/null 2>/dev/null | openssl x509 -noout -dates 2>/dev/null | grep notAfter)
 
     echo "$pair -> $not_after"
 done
